@@ -44,6 +44,21 @@
 </div>
 <br>
 
+## 【 技術 】
+<br>
+<div align="center">
+        
+| 用途 | 使用技術 |
+|---|---|
+| 資料擷取 | requests、BeautifulSoup、正規表示式、OpenAlex API、MediaWiki API |
+| 資料處理 | pandas（必填、格式、來源等級等驗證） |
+| 資料庫 | SQLite、FTS5 全文檢索（trigram 分詞） |
+| 搜尋 | 同義詞展開 → 關鍵詞比對（LIKE）＋全文檢索 → 依命中詞數與 bm25 分數排序 |
+| 網站 | Streamlit（部署於 Streamlit Community Cloud） |
+| 測試 | 自動小考 quiz.py、matplotlib 畫答對率圖 |
+</div>
+<br>
+
 ## 【 資料來源 】
 
 ```
@@ -61,20 +76,7 @@ jade.db（SQLite）
 - 本專案的資料庫已清空暫存區的原文，只保留審核後的知識卡。
 <br>
 
-## 【 技術 】
-<br>
-<div align="center">
-        
-| 用途 | 使用技術 |
-|---|---|
-| 資料擷取 | requests、BeautifulSoup、正規表示式、OpenAlex API、MediaWiki API |
-| 資料處理 | pandas（必填、格式、來源等級等驗證） |
-| 資料庫 | SQLite、FTS5 全文檢索（trigram 分詞） |
-| 搜尋 | 同義詞展開 → 關鍵詞比對（LIKE）＋全文檢索 → 依命中詞數與 bm25 分數排序 |
-| 網站 | Streamlit（部署於 Streamlit Community Cloud） |
-| 測試 | 自動小考 quiz.py、matplotlib 畫答對率圖 |
-</div>
-<br>
+
 
 ## 【 本機執行 】
 
