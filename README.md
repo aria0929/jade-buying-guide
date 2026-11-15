@@ -1,4 +1,9 @@
 <h1 align="center">一玉了然｜翡翠選購指南</h1>
+
+<p align="center">
+  🔗 <b>線上網站：<a href="https://jade-buying-guide-c6jd6hpqyhy7c2ns2ckl2h.streamlit.app/">點這裡開啟一玉了然</a></b><br>
+  <sub>網站使用免費主機，一段時間沒人使用會休眠；若看到「This app has gone to sleep」，按 <b>Yes, get this app back up!</b> 等約 1 分鐘即可使用。</sub>
+</p>
 <br>
 
 ## 【 製作動機 】
