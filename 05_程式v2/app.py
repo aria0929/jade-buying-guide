@@ -21,6 +21,7 @@ import random
 import time
 
 import streamlit as st
+import streamlit.components.v1 as components
 from streamlit import config
 
 # 網站只呼叫 search.py、recommend.py 的函式（模組化）
@@ -221,7 +222,21 @@ details.qa[open] summary::before { transform: rotate(90deg); }
 .st-key-bot-fab button p { font-size: 1.15rem; font-weight: 700; color: white; }
 .st-key-bot-fab button [data-testid="stIconMaterial"] { font-size: 0; width: 1.9rem !important; height: 1.9rem !important; min-width: 1.9rem; margin-right: 0.45rem; background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><line x1='16' y1='4' x2='16' y2='9' stroke='white' stroke-width='2' stroke-linecap='round'/><circle cx='16' cy='3.5' r='2' fill='white'/><rect x='5' y='9' width='22' height='18' rx='6' fill='white'/><circle cx='12' cy='17' r='2' fill='%230B5C52'/><circle cx='20' cy='17' r='2' fill='%230B5C52'/><line x1='13' y1='22' x2='19' y2='22' stroke='%230B5C52' stroke-width='1.6' stroke-linecap='round'/></svg>") no-repeat center / contain; }
 @media (min-width: 641px) { div[role="dialog"]:has(.st-key-bot-box) { position: fixed; right: 1.5rem; bottom: 5rem; margin: 0; max-height: calc(100vh - 6rem); } }
-@media (max-width: 640px) { .st-key-bot-fab { right: 0.8rem; bottom: 5.5rem; } .st-key-bot-fab::before { font-size: 0.95rem; } }
+/* 手機版：平常是右下角的小圓形（機器人圖示置中）；點第一下展開成膠囊「問答機器人」（.bot-open，由頁尾的 JS 切換），再點一下才打開對話 */
+@media (max-width: 640px) {
+  .st-key-bot-fab { right: 0.8rem; bottom: 2.6rem; }
+  .st-key-bot-fab::before, .st-key-bot-fab::after { display: none; }
+  .st-key-bot-fab button { width: auto; min-width: 2.8rem; height: 2.8rem; min-height: 2.8rem; padding: 0 0.6rem; border-radius: 1.4rem; transition: padding 0.3s ease; }
+  .st-key-bot-fab button [data-testid="stMarkdownContainer"] { display: none; }
+  .st-key-bot-fab button > div { gap: 0; width: auto !important; min-width: 0; flex: 0 0 auto; justify-content: center; }
+  .st-key-bot-fab button > div > span, .st-key-bot-fab button > div > span > span { width: auto; min-width: 1.6rem; justify-content: center; }
+  .st-key-bot-fab button [data-testid="stIconMaterial"] { margin-right: 0; width: 1.6rem !important; height: 1.6rem !important; min-width: 1.6rem; }
+  .st-key-bot-fab button::after { content: "問答機器人"; display: inline-block; flex-shrink: 0; max-width: 0; overflow: hidden; white-space: nowrap; color: white; font-size: 0.95rem; font-weight: 700; margin-left: 0; transition: max-width 0.3s ease, margin-left 0.3s ease; }
+  .st-key-bot-fab.bot-open button { padding: 0 0.9rem 0 0.7rem; }
+  .st-key-bot-fab.bot-open button::after { max-width: 8rem; margin-left: 0.35rem; }
+  .check-float { right: 4.4rem; }
+}
+.st-key-bot-js { position: absolute; width: 0; height: 0; overflow: hidden; }
 /* 翠小二對話框：高度跟著螢幕高度縮放，輸入框才不會被擠到視窗外面；「重新開始對話」不換行、靠右 */
 div[role="dialog"] div.stVerticalBlock.st-key-bot-box, div[role="dialog"] div:has(> div.stVerticalBlock.st-key-bot-box) { height: max(10rem, min(430px, calc(100vh - 25rem))) !important; max-height: max(10rem, min(430px, calc(100vh - 25rem))) !important; }
 .st-key-bot-reset { width: auto !important; margin-left: auto; }
@@ -880,6 +895,30 @@ def bot_window():
 # 右下角的浮動按鈕（位置、顏色、上面的提示泡泡在 CSS：.st-key-bot-fab）
 if st.button("問翠小二", icon=":material/smart_toy:", key="bot-fab"):
     bot_window()
+
+# 手機版：第一下只把小圖示展開成「問答機器人」膠囊，第二下才真的打開對話；4 秒沒點就縮回去。
+# Streamlit 的按鈕沒有「第一下先不要動」的設定，所以用一小段 JavaScript 在網頁上攔截第一下點擊（電腦版不攔）。
+with st.container(key="bot-js"):
+    components.html("""
+<script>
+const w = window.parent, doc = w.document;
+if (!w.__botFabReady) {
+  w.__botFabReady = true;
+  doc.addEventListener("click", (e) => {
+    const fab = e.target.closest && e.target.closest(".st-key-bot-fab");
+    if (!fab || !w.matchMedia("(max-width: 640px)").matches) return;
+    clearTimeout(w.__botFabTimer);
+    if (!fab.classList.contains("bot-open")) {
+      e.preventDefault();
+      e.stopPropagation();                      // 第一下：不打開對話，只展開膠囊
+      fab.classList.add("bot-open");
+      w.__botFabTimer = setTimeout(() => fab.classList.remove("bot-open"), 4000);
+    } else {
+      setTimeout(() => fab.classList.remove("bot-open"), 400);   // 第二下：照常打開對話，膠囊縮回去
+    }
+  }, true);
+}
+</script>""", height=0)
 
 # 頁尾與側邊欄
 modified = DB.stat().st_mtime
