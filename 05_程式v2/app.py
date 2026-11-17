@@ -213,7 +213,7 @@ details.qa[open] summary::before { transform: rotate(90deg); }
 }
 
 /* 翠小二：右下角浮動按鈕（機器人圖示＋上面一個會輕輕跳動的提示泡泡），對話視窗靠右下 */
-.st-key-bot-fab { position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 1000; width: auto !important; }
+.st-key-bot-fab { position: fixed; right: 1.5rem; bottom: 4.5rem; z-index: 1000; width: auto !important; }
 .st-key-bot-fab::before { content: "翡翠問題問我～"; position: absolute; right: 0; bottom: 4.4rem; width: 11rem; box-sizing: border-box; text-align: center; white-space: nowrap; background: #FFF6D5; color: #0B5C52; font-size: 1.05rem; font-weight: 700; padding: 0.45rem 0.7rem; border-radius: 0.9rem; border: 2px solid #0B7A6B; box-shadow: 0 4px 12px rgba(11, 92, 82, 0.25); animation: bubble-bounce 2.4s ease-in-out infinite; }
 .st-key-bot-fab::after { content: ""; position: absolute; right: 5rem; bottom: 3.7rem; border-left: 0.5rem solid transparent; border-right: 0.5rem solid transparent; border-top: 0.6rem solid #0B7A6B; border-bottom: 0; animation: bubble-bounce 2.4s ease-in-out infinite; }
 @keyframes bubble-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-0.3rem); } }
@@ -221,10 +221,10 @@ details.qa[open] summary::before { transform: rotate(90deg); }
 .st-key-bot-fab button:hover, .st-key-bot-fab button:focus { background: #0B5C52; color: white; border: none; }
 .st-key-bot-fab button p { font-size: 1.15rem; font-weight: 700; color: white; }
 .st-key-bot-fab button [data-testid="stIconMaterial"] { font-size: 0; width: 1.9rem !important; height: 1.9rem !important; min-width: 1.9rem; margin-right: 0.45rem; background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><line x1='16' y1='4' x2='16' y2='9' stroke='white' stroke-width='2' stroke-linecap='round'/><circle cx='16' cy='3.5' r='2' fill='white'/><rect x='5' y='9' width='22' height='18' rx='6' fill='white'/><circle cx='12' cy='17' r='2' fill='%230B5C52'/><circle cx='20' cy='17' r='2' fill='%230B5C52'/><line x1='13' y1='22' x2='19' y2='22' stroke='%230B5C52' stroke-width='1.6' stroke-linecap='round'/></svg>") no-repeat center / contain; }
-@media (min-width: 641px) { div[role="dialog"]:has(.st-key-bot-box) { position: fixed; right: 1.5rem; bottom: 5rem; margin: 0; max-height: calc(100vh - 6rem); } }
+@media (min-width: 641px) { div[role="dialog"]:has(.st-key-bot-box) { position: fixed; right: 1.5rem; bottom: 8rem; margin: 0; max-height: calc(100vh - 9rem); } }
 /* 手機版：平常是右下角的小圓形（機器人圖示置中）；點第一下展開成膠囊「問答機器人」（.bot-open，由頁尾的 JS 切換），再點一下才打開對話 */
 @media (max-width: 640px) {
-  .st-key-bot-fab { right: 0.8rem; bottom: 2.6rem; }
+  .st-key-bot-fab { right: 0.8rem; bottom: 5rem; }
   .st-key-bot-fab::before, .st-key-bot-fab::after { display: none; }
   .st-key-bot-fab button { width: auto; min-width: 2.8rem; height: 2.8rem; min-height: 2.8rem; padding: 0 0.6rem; border-radius: 1.4rem; transition: padding 0.3s ease; }
   .st-key-bot-fab button [data-testid="stMarkdownContainer"] { display: none; }
