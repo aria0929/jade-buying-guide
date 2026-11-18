@@ -118,38 +118,55 @@ if len(wrong) == 0:
 
 now.to_csv(RESULT_FILE, index=False, encoding="utf-8-sig")
 
-# %% 7. 畫圖：上次（灰）和這次（綠）並排比較
+# %% 7. 畫圖：上次（灰）和這次（綠）並排比較；長條上方寫「答對題數/題數」
+
+GRAY = "#C9C3B3"
+GREEN = "#4E6A22"
+BROWN = "#A8692E"     # 沒有全對的題型，題數用棕色標出
+PAPER = "#F4F0E6"     # 米色底，和簡報底色一樣
 
 plt.rcParams["font.sans-serif"] = ["Microsoft JhengHei", "PingFang TC"]
-plt.figure(figsize=(8, 4.8))
+plt.figure(figsize=(8, 4.8), facecolor=PAPER)
+plt.gca().set_facecolor(PAPER)
 
 x = range(len(KINDS))
 labels = []
 for kind in KINDS:
-    labels.append(f"{NAMES[kind]}\n（{kind}）")
+    labels.append(NAMES[kind])
 
+# 每組長條：（圖例文字, 成績表, 顏色, 往左右偏移多少）
 if last is None:
-    plt.bar(list(x), now_rates, width=0.5, color="#1F7A5C")
-    for i in x:
-        plt.text(i, now_rates[i] + 2, f"{now_rates[i]}%", ha="center", fontsize=11)
-    plt.title(f"小考結果：{total} 題答對 {right} 題")
+    groups = [(f"這次（{right}/{total} 題）", now, GREEN, 0)]
 else:
-    left = []
-    right_x = []
-    for i in x:
-        left.append(i - 0.2)
-        right_x.append(i + 0.2)
-    plt.bar(left, last_rates, width=0.38, color="#B8C2BF", label=f"改之前（{last_right}/{len(last)}）")
-    plt.bar(right_x, now_rates, width=0.38, color="#1F7A5C", label=f"改之後（{right}/{total}）")
-    for i in x:
-        plt.text(left[i], last_rates[i] + 2, f"{last_rates[i]}%", ha="center", fontsize=10)
-        plt.text(right_x[i], now_rates[i] + 2, f"{now_rates[i]}%", ha="center", fontsize=10)
-    plt.legend(loc="lower right")
-    plt.title("小考前後比較：各題型答對率")
+    groups = [(f"修正前（{last_right}/{len(last)} 題）", last, GRAY, -0.18),
+              (f"修正後（{right}/{total} 題）", now, GREEN, 0.18)]
 
-plt.xticks(list(x), labels)
-plt.ylim(0, 115)
-plt.ylabel("答對率（%）")
+for name, table, color, shift in groups:
+    rates = []
+    positions = []
+    for i in x:
+        rates.append(rate_of(table, KINDS[i]))
+        positions.append(i + shift)
+    plt.bar(positions, rates, width=0.32, color=color, label=name, zorder=3)
+
+    for i in x:     # 長條上方寫答對題數；全對用深灰、沒全對用棕色
+        part = table[table["題型"] == KINDS[i]]
+        ok = part[part["結果"] == "✓"]
+        if len(ok) == len(part):
+            text_color = "#34383A"
+        else:
+            text_color = BROWN
+        plt.text(positions[i], rates[i] + 2, f"{len(ok)}/{len(part)}", ha="center", fontsize=10, color=text_color)
+
+plt.xticks(list(x), labels, fontsize=11)
+plt.yticks([0, 50, 100], ["0%", "50%", "100%"], color="#77786F")
+plt.ylim(0, 112)
+plt.grid(axis="y", color="#E4DDCF", linewidth=0.6, zorder=0)
+for side in ["top", "right", "left"]:     # 只留下方的底線
+    plt.gca().spines[side].set_visible(False)
+plt.gca().spines["bottom"].set_color("#BDB6A6")
+plt.tick_params(length=0)
+plt.legend(loc="lower right", bbox_to_anchor=(1, 1.0), ncol=2, frameon=False)
 plt.tight_layout()
-plt.savefig(FIGURE_FILE, dpi=150)
+plt.savefig(FIGURE_FILE, dpi=150, facecolor=PAPER)
 plt.show()
