@@ -8,8 +8,8 @@
     3. 啟動：streamlit run app.py
     4. 手機與電腦連同一個 Wi-Fi 時，可以用終端機顯示的 Network URL 在手機上測試。
 
-查詢紀錄（query_log）只給自己看：側邊欄輸入管理密碼後可查看與下載。
-注意：雲端網站重啟後查詢紀錄會清空，想保留就先下載。
+查詢紀錄（query_log）僅供管理者查看：網址加上 ?admin=1，在側邊欄輸入管理密碼後可查看與下載。
+注意：雲端網站重啟後查詢紀錄會清空，需要保留請先下載。
 """
 
 from datetime import datetime
@@ -24,21 +24,22 @@ import streamlit as st
 import streamlit.components.v1 as components
 from streamlit import config
 
-# 網站只呼叫 search.py、recommend.py 的函式（模組化）
+# 網站只負責畫面；搜尋、選款、翠小二的邏輯分別在 search.py、recommend.py、bot.py
 from recommend import AGES, BUDGETS, ITEMS, TARGETS, USES, find_rule, find_tips
 from bot import WELCOME, reply, start_options
 from search import DB, cards_by_category, categories, connect, hot_cards, log_query, search
 
 # %% 0. 頁面設定與樣式
 
-# 網頁分頁標題與版面寬度（一定要寫在最前面）
-# 把 Streamlit 的主題色從預設紅色換成翡翠綠（.streamlit 資料夾不會上傳，所以寫在程式裡）
+# Streamlit 主題色由預設的紅色改為翡翠綠（.streamlit 設定資料夾不上傳，所以寫在程式裡）
 config.set_option("theme.primaryColor", "#0B7A6B")
 config.set_option("theme.greenColor", "#0B7A6B")
 config.set_option("theme.greenTextColor", "#0B7A6B")
+
+# 網頁標題與版面寬度（必須是第一個 Streamlit 指令）
 st.set_page_config(page_title="一玉了然｜翡翠選購指南", layout="wide", initial_sidebar_state="collapsed")
 
-# 分頁：電腦上等寬；手機（640px 以下）恢復原寬度、可左右滑
+# 全站樣式（CSS）：配色、字體、卡片、分頁、翠小二按鈕，以及手機版（640px 以下）的排版
 st.markdown(
     """
 <style>
@@ -256,7 +257,7 @@ div[role="dialog"] div.stVerticalBlock.st-key-bot-box, div[role="dialog"] div:ha
     unsafe_allow_html=True,
 )
 
-# %% 1. get_jade_db() 資料庫連線只建立一次就重複使用；不然每次重跑都要重新連線，網站會變慢
+# %% 1. get_jade_db() 資料庫連線只建立一次並重複使用（Streamlit 每次操作都會重跑整支程式）
 
 @st.cache_resource
 def get_jade_db():
@@ -296,6 +297,10 @@ CHECKLIST = {
     ],
 }
 
+# 避坑清單確認到這個數量，就提示「可以考慮購買」
+CHECK_ENOUGH = 10
+
+# 主題瀏覽：每個分類的一句說明
 TOPIC_DESC = {
     "認識翡翠": "翡翠是什麼、產地在哪裡？",
     "品質判斷": "翡翠五大關鍵：種、色、水、底、工",
@@ -306,7 +311,7 @@ TOPIC_DESC = {
     "配戴保養": "怎麼保養、清潔與收納？",
 }
 
-# 新手入門：分 5 段，每一點都整理自知識卡（卡號記在註解）
+# 新手入門：分 5 段，內容皆整理自知識卡（卡號標在各段註解）
 JADE_TABLE = [
     {"比較": "屬於", "翡翠": "硬玉", "和田玉": "軟玉"},
     {"比較": "組成", "翡翠": "輝石類的細小晶體", "和田玉": "透閃石纖維交織"},
@@ -314,6 +319,7 @@ JADE_TABLE = [
     {"比較": "硬度", "翡翠": "6.5–7", "和田玉": "6–6.5"},
     {"比較": "主要產地", "翡翠": "緬甸，其次是瓜地馬拉", "和田玉": "新疆和田"},
 ]
+
 # 五個關鍵字：(字, 意思, 怎麼看, 判斷依據)；種 K010、水 K010／K021、色 K026、底 K018、工 K017
 FIVE_KEYS = [
     ("種", "質地細不細", "顆粒越細、結構越緊密越好", "等級：玻璃種＞冰種＞糯種＞豆種"),
@@ -322,13 +328,15 @@ FIVE_KEYS = [
     ("底", "乾不乾淨", "瑕疵越少越好", "依據：黑花、白花、絲狀瑕疵"),
     ("工", "切工好不好", "有雕花的另外看雕刻工藝", "依據：以沒有雕花的光身成品評"),
 ]
-# 常見迷思 vs 真相（K037、K034、K040、K044／K046），畫成 2×2 小卡
+
+# 常見迷思與真相（K037、K034、K040、K044／K046），排成 2×2
 MYTHS = [
     {"常見迷思": "綠色的玉就是翡翠", "真相": "常見的仿品是綠玉髓，拿起來比較輕"},
     {"常見迷思": "用手電筒照一照就知道真假", "真相": "手電筒只能看瑕疵，不能判斷真假"},
     {"常見迷思": "越透越漂亮，一定是 A 貨", "真相": "灌膠的 B 貨反而更透，肉眼看不出來"},
     {"常見迷思": "店家說保證天然就放心", "真相": "買附鑑定證書的，並到鑑定機構網站查證"},
 ]
+
 # 實用知識：建議這樣做（K065、K066、K068、K069）／要避免（K064、K067、K069）
 CARE_DO = [
     "清潔用溫和的肥皂水最安全",
@@ -342,6 +350,7 @@ CARE_AVOID = [
     "高溫：例如珠寶師傅用的焊槍",
     "溫熱的酸：可能會受影響",
 ]
+
 # 挑選四步驟：(步驟, 重點)；K045、K057／K063、K050、K046
 STEPS = [
     ("抓預算", "先學會判斷檔次，再依預算找合適的檔次"),
@@ -350,22 +359,12 @@ STEPS = [
     ("要證書", "附鑑定證書，並到鑑定機構網站查證"),
 ]
 
-# %% 3. 共用元件
+# %% 3. 知識卡配圖
 
-# 知識卡配圖：images 資料夾裡的「圖片來源.csv」記錄每張卡用哪張圖、圖說和出處
 IMAGE_DIR = Path(__file__).resolve().parent / "images"
-IMAGES = {}
-if (IMAGE_DIR / "圖片來源.csv").exists():
-    with open(IMAGE_DIR / "圖片來源.csv", encoding="utf-8-sig") as f:
-        for row in csv.DictReader(f):
-            image_path = IMAGE_DIR / row["檔名"]
-            with open(image_path, "rb") as image_file:
-                image_bytes = image_file.read()
-            data = base64.b64encode(image_bytes).decode()
-            IMAGES[row["編號"]] = (data, row["圖說"], row["來源"])
 
-# 個別圖片的顯示寬度（px）；沒列的維持預設 620。
-# 放大以不超過照片本身清晰度為準（照片夠大才放大），直式或比較糊的照片縮小
+# 個別圖片的顯示寬度（px），未列出的使用預設 620
+# 照片解析度足夠才放大；直式或解析度較低的照片縮小，避免模糊
 IMAGE_WIDTH = {
     "K007": 760, "K010": 900, "K011": 900, "K012": 700, "K015": 720,
     "K055": 700, "K063": 820,
@@ -376,19 +375,36 @@ IMAGE_WIDTH = {
     "K022": 240,
     "K016": 480,
 }
+DEFAULT_WIDTH = 620
 
-# 把某張卡的配圖變成網頁 HTML：圖片＋圖說＋出處；沒有配圖就回傳空字串
+# load_images() 讀「圖片來源.csv」，回傳 {編號: (圖片的 base64 文字, 圖說, 出處)}
+# 圖片轉成 base64 文字後可以直接放進網頁 HTML
+def load_images():
+    images = {}
+    index_file = IMAGE_DIR / "圖片來源.csv"
+    if not index_file.exists():
+        return images
+    with open(index_file, encoding="utf-8-sig") as f:
+        for row in csv.DictReader(f):
+            with open(IMAGE_DIR / row["檔名"], "rb") as image_file:
+                data = base64.b64encode(image_file.read()).decode()
+            images[row["編號"]] = (data, row["圖說"], row["來源"])
+    return images
+
+IMAGES = load_images()
+
+# %% 4. image_html() 某張卡的配圖 HTML：圖片＋圖說＋出處；沒有配圖就回傳空字串
+
 def image_html(card_id, width=0):
     if card_id not in IMAGES:
         return ""
     file_data, caption, credit = IMAGES[card_id]
     if width == 0:
-        width = IMAGE_WIDTH.get(card_id, 620)
+        width = IMAGE_WIDTH.get(card_id, DEFAULT_WIDTH)
     return (f'<figure class="card-img" style="max-width: {width}px"><img src="data:image/jpeg;base64,{file_data}" alt="{caption}">'
             f'<figcaption>{caption}<br><span>{credit}</span></figcaption></figure>')
 
-
-# %% 4. sources_html() 參考資料：放在卡片最底下，附來源等級
+# %% 5. sources_html() 卡片最下方的參考資料，標示來源等級
 
 def sources_html(sources, number=""):
     lines = ""
@@ -402,7 +418,7 @@ def sources_html(sources, number=""):
         lines += f"<div>• {source['id']}｜{source['level']} 級{note}｜{name}<span class='src-date'>｜存取日期 {source['accessed']}</span></div>"
     return f'<div class="sources"><div class="sources-head"><span>參考資料</span><span>{number}</span></div>{lines}</div>'
 
-# %% 5. 一張卡片的內容：答案 → 選購提醒 → 參考資料，回傳一段 HTML
+# %% 6. card_body() 一張卡片的內容 HTML：答案 → 配圖 → 選購提醒 → 參考資料
 
 def card_body(card, number=""):
     html = f'<div class="answer">{card["answer"]}</div>'
@@ -412,7 +428,7 @@ def card_body(card, number=""):
     html += sources_html(card["sources"], number)
     return html
 
-# %% 6. 知識搜尋的卡片：綠色標題列＋內容，外面有明顯的外框（key 讓 CSS 找得到這個方框）
+# %% 7. answer_card() 知識搜尋的結果卡片：綠色標題列＋內容（key 讓 CSS 能找到這個外框）
 
 def answer_card(card, num):
     title = f"{num}. {card['question']}"
@@ -420,7 +436,7 @@ def answer_card(card, num):
         st.html(f'<div class="card-title"><span>{title}</span><small><span class="card-badge">{card["category"]}</span>{card["id"]}</small></div>')
         st.html(card_body(card))
 
-# %% 7. 常見問題、主題瀏覽的一題：點問題才展開
+# %% 8. qa_item() 常見問題、主題瀏覽的一題：點選題目才展開
 
 def qa_item(card, group, is_open=False):
     open_attr = ""
@@ -428,27 +444,28 @@ def qa_item(card, group, is_open=False):
         open_attr = " open"
     return f'<details class="qa" name="{group}"{open_attr}><summary>{card["question"]}</summary><div class="qa-body">{card_body(card, card["id"])}</div></details>'
 
-# %% 8. section() 每個區塊的小標題（下面有一條綠線）
+# %% 9. section() 區塊小標題（圓形編號＋下方綠線）
 
 def section(title):
     st.space("medium")
     number, name = title.split("、", 1)
     st.html(f'<div class="sec-head"><span class="sec-num">{number}</span>{name}</div>')
 
-# %% 9. admin_panel() 查詢紀錄只給自己看：輸入管理密碼才顯示
+# %% 10. admin_panel() 查詢紀錄（僅供管理者）：輸入管理密碼才顯示
 
 def admin_panel():
     with st.sidebar.expander("查詢紀錄（管理者）"):
         try:
             password = st.secrets.get("ADMIN_PASSWORD", "")
         except Exception:
-            password = ""
+            password = ""                       # 本機沒有 secrets.toml 時
         if not password:
             st.caption("尚未設定 ADMIN_PASSWORD（.streamlit/secrets.toml）。")
             return
         typed = st.text_input("管理密碼", type="password")
         if typed != password:
             return
+
         log = pd.read_sql("SELECT ts AS 時間, query AS 問句, hits AS 命中筆數 FROM query_log ORDER BY id DESC", jade_db)
         no_result = int((log["命中筆數"] == 0).sum())
         st.caption(f"共 {len(log)} 筆；查無資料 {no_result} 筆")
@@ -457,89 +474,79 @@ def admin_panel():
         csv_data = log.to_csv(index=False).encode("utf-8-sig")
         st.download_button("下載 CSV", csv_data, file_name=f"query_log_{today}.csv", mime="text/csv")
 
-# %% 10. 版面
+# %% 11. 分頁「知識搜尋」
 
-# 網站標題：深綠色橫幅
-st.html('<div class="site-head"><div class="site-name">一玉了然</div><div class="site-sub">翡翠選購指南｜可追溯來源的知識檢索系統</div></div>')
-
-# 常見問題每次顯示幾題（標「熱門」的卡打亂順序後，一批一批輪流顯示）
+# 常見問題每次顯示幾題（熱門卡片打亂順序後，分批輪流顯示）
 HOT_SHOW = 5
 
-# 五個分頁，照新手的順序排：先學基礎（新手入門）→ 找答案（知識搜尋、主題瀏覽）→ 要購買（選款建議、避坑清單）
-TAB_NAMES = ["新手入門", "知識搜尋", "主題瀏覽", "選款建議", "避坑清單"]
-# 「下一步」的連結會在網址加上 ?tab=分頁名稱，這裡讀出來，打開那個分頁
-open_tab = st.query_params.get("tab")
-if open_tab not in TAB_NAMES:
-    open_tab = None
-# 讓翠小二的導覽按鈕能透過 session_state 切換分頁
-tab_basics, tab_search, tab_topics, tab_rec, tab_check = st.tabs(
-    TAB_NAMES, default=open_tab, key="main_tabs", on_change="rerun")
+# clear_search() 按「✕」時清空搜尋框
+def clear_search():
+    st.session_state["search_query"] = ""
 
-# 1. 知識搜尋
-with tab_search:
+# show_search_result() 顯示搜尋結果；知識庫沒有的題目直接說明查無資料，不以不相關的卡片湊數
+def show_search_result(query):
+    result = search(query, jade_db=jade_db)
+
+    # 每次操作都會重跑整頁，同一句只記錄一次
+    if st.session_state.get("last_logged") != query:
+        log_query(jade_db, query, len(result["results"]))
+        st.session_state["last_logged"] = query
+
+    if result["status"] == "ok":
+        st.markdown(f'<div class="result-count">找到 {len(result["results"])} 筆相關知識</div>', unsafe_allow_html=True)
+        for i, card in enumerate(result["results"], 1):
+            answer_card(card, num=i)
+    elif result["status"] == "NOT_JADE":
+        st.info("查無資料：這個問題不在翡翠選購的範圍內。")
+    else:
+        st.info(f"目前還沒有「{query.strip()}」的相關內容。作者會參考大家搜尋的問題，持續補充知識庫。")
+
+# show_hot_questions() 尚未輸入時顯示常見問題；session_state 記住打亂後的順序與目前位置，「換一批」才能依序看完、不重複
+def show_hot_questions():
+    st.space("small")
+    st.divider()
+    st.space("small")
+    left, right = st.columns([5, 1], vertical_alignment="center")
+    left.markdown('<div class="hot-tip">【FAQ】<span class="footer-full">或參考以下常見選購問題，點選題目即可查看完整說明與參考資料。</span><span class="footer-short">點選題目查看說明與參考資料</span></div>', unsafe_allow_html=True)
+    refresh = right.button("換一批", icon=":material/refresh:", use_container_width=True)
+
+    if "hot_order" not in st.session_state:
+        hot = hot_cards(jade_db)
+        random.shuffle(hot)
+        st.session_state.hot_order = hot
+        st.session_state.hot_start = 0
+    order = st.session_state.hot_order
+    if refresh:
+        st.session_state.hot_start = (st.session_state.hot_start + HOT_SHOW) % len(order)     # 超過最後一題就從頭開始
+
+    hot_html = ""
+    for k in range(min(HOT_SHOW, len(order))):
+        card = order[(st.session_state.hot_start + k) % len(order)]
+        hot_html += qa_item(card, "hot")
+    st.html(hot_html)
+
+def search_tab():
     st.space("medium")
-    # 按「清除搜尋」時把搜尋框清空
-    def clear_search():
-        st.session_state["search_query"] = ""
-
     query = st.text_input("【搜尋】輸入問題或關鍵字：", placeholder="例：「B貨是什麼意思」 或 「B貨」", key="search_query")
-    # 有輸入內容時，搜尋框右側顯示 X（用 CSS 把按鈕疊到搜尋框裡）
     if query.strip():
-        st.button("✕", on_click=clear_search, key="search_clear", help="清除輸入內容")
+        st.button("✕", on_click=clear_search, key="search_clear", help="清除輸入內容")     # CSS 會把這個按鈕疊到搜尋框右側
 
-    # 只打一個字通常找不到有意義的結果，先請使用者多打一點
+    # 單一個字通常找不到有意義的結果
     if len(query.strip()) == 1:
         st.info("請輸入兩字以上的關鍵字或問句。")
     elif query.strip():
-        # 回傳狀態（ok／查無／範圍外）與知識卡
-        result = search(query, jade_db=jade_db)
-        # 切換其他選項時整頁會重跑，同一句只記一次
-        if st.session_state.get("last_logged") != query:
-            log_query(jade_db, query, len(result["results"]))
-            st.session_state["last_logged"] = query
-        if result["status"] == "ok":
-            st.markdown(f'<div class="result-count">找到 {len(result["results"])} 筆相關知識</div>', unsafe_allow_html=True)
-            for i, card in enumerate(result["results"], 1):
-                answer_card(card, num=i)
-        else:
-            # 知識庫沒有的題目直接說查無資料，不拿不相關的卡硬湊答案
-            if result["status"] == "NOT_JADE":
-                st.info("查無資料：這個問題不在翡翠選購的範圍內。")
-            else:
-                st.info(f"目前還沒有「{query.strip()}」的相關內容。作者會參考大家搜尋的問題，持續補充知識庫。")
+        show_search_result(query)
 
-    # 還沒輸入時顯示常見問題，給不知道要搜什麼的人；開始打字就換成搜尋結果
     if not query.strip():
-        # 搜尋框和常見問題之間，中間畫一條線分開
-        st.space("small")
-        st.divider()
-        st.space("small")
-        left, right = st.columns([5, 1], vertical_alignment="center")
-        left.markdown('<div class="hot-tip">【FAQ】<span class="footer-full">或參考以下常見選購問題，點選題目即可查看完整說明與參考資料。</span><span class="footer-short">點選題目查看說明與參考資料</span></div>', unsafe_allow_html=True)
-        refresh = right.button("換一批", icon=":material/refresh:", use_container_width=True)
-        # session_state 記住打亂後的順序和目前看到第幾題，換一批才能依序看完全部、不重複
-        if "hot_order" not in st.session_state:
-            hot = hot_cards(jade_db)
-            random.shuffle(hot)
-            st.session_state.hot_order = hot
-            st.session_state.hot_start = 0
-        order = st.session_state.hot_order
-        if refresh:
-            # 超過最後一題就繞回開頭
-            st.session_state.hot_start = (st.session_state.hot_start + HOT_SHOW) % len(order)
-        hot_html = ""
-        for k in range(min(HOT_SHOW, len(order))):
-            card = order[(st.session_state.hot_start + k) % len(order)]
-            hot_html += qa_item(card, "hot")
-        st.html(hot_html)
+        show_hot_questions()
 
-# 2. 新手入門
-with tab_basics:
+# %% 12. 分頁「新手入門」
+
+def basics_tab():
     section("一、認識翡翠")
     st.write("「玉」是統稱，分成硬玉和軟玉：翡翠是硬玉，和田玉是軟玉。")
     st.space("small")
-    # 以「比較」欄當索引，不顯示 0、1、2 列號
-    st.table(pd.DataFrame(JADE_TABLE).set_index("比較"))
+    st.table(pd.DataFrame(JADE_TABLE).set_index("比較"))      # 以「比較」欄當索引，不顯示列號
     if "K002" in IMAGES:
         st.html(image_html("K002"))
     st.space("small")
@@ -547,21 +554,21 @@ with tab_basics:
     section("二、種、色、水、底、工")
     st.write("決定翡翠好壞與價格的五個關鍵字：")
     st.space("small")
-    # 分兩排：第一排種水色（3 格）；第二排底工（2 格），左右各留半格空白，放在正中間
+    # 第一排「種、水、色」3 格；第二排「底、工」2 格，左右各留空白讓它置中
     top = st.columns(3)
     bottom = st.columns([1, 2, 2, 1])
     boxes = [top[0], top[1], top[2], bottom[1], bottom[2]]
     for i in range(len(FIVE_KEYS)):
         word, short, how, basis = FIVE_KEYS[i]
-        # 同一排的方框等高
-        with boxes[i].container(border=True, height="stretch"):
+        with boxes[i].container(border=True, height="stretch"):      # height="stretch"：同一排的方框等高
             st.markdown(f"## :green[{word}]")
             st.markdown(f"**{short}**")
             st.caption(how)
             label, content = basis.split("：")
             st.markdown(f"**{label}**：{content}")
     st.space("small")
-    # 顏色圖和「底、工」那排一樣寬（左右各留 1 份、中間佔 4 份）
+
+    # 配圖與「底、工」那排同寬（左右各留 1 份、中間占 4 份）
     if "K007" in IMAGES:
         st.columns([1, 4, 1])[1].html(image_html("K007", 2000))
     image_col = st.columns([1, 4, 1])[1]
@@ -601,7 +608,8 @@ with tab_basics:
                 st.html(f'<div class="box-title">步驟 {start + i + 1}｜{step}</div>')
                 st.caption(point)
     st.space("small")
-    # 兩塊並排：想查資料／準備要買；連結做成按鈕，點了會打開那個分頁
+
+    # 下一步：連結帶 ?tab=分頁名稱，點了會打開那個分頁
     st.html(
         '<div class="next-grid">'
         '<div class="next-col"><div>還有問題想查</div>'
@@ -615,48 +623,130 @@ with tab_basics:
     st.space("small")
     st.markdown('<div class="center-note">以上整理自本站知識卡；完整說明和參考資料，可以到「主題瀏覽」查看。</div>', unsafe_allow_html=True)
 
-# 3. 主題瀏覽
-with tab_topics:
+# %% 13. 分頁「主題瀏覽」
+
+def topics_tab():
     st.space("medium")
-    # 主題瀏覽：選一個分類，列出該分類所有卡片
     topics = {}
     for category, count in categories(jade_db):
         topics[category] = count
-    names = list(topics)
 
-    # 標籤上顯示的文字，例如「認識翡翠（7）」
+    # 標籤文字顯示張數，例如「認識翡翠（7）」
     def topic_label(category):
         return f"{category}（{topics[category]}）"
+
     st.markdown('<div class="topic-title">請點選以下主題選擇分類</div>', unsafe_allow_html=True)
-    topic = st.pills("選擇分類", names, format_func=topic_label, key="topic_pill", label_visibility="collapsed")
-    if topic:
-        # 電腦版：被點選的那顆標籤顯示「【分類】說明」。標籤真正的文字不能改（改了 Streamlit 會當成新元件、選取狀態會不見），
-        pill_text = f"【{topic}】{TOPIC_DESC.get(topic, '')}"
-        st.markdown(f'''<style>
+    topic = st.pills("選擇分類", list(topics), format_func=topic_label, key="topic_pill", label_visibility="collapsed")
+    if not topic:
+        return
+
+    # 電腦版：選中的標籤改顯示「【分類】說明」。標籤本身的文字不能改（Streamlit 會視為新元件、選取狀態會消失），
+    # 所以用 CSS 把原文字隱藏，再用 ::after 顯示說明
+    pill_text = f"【{topic}】{TOPIC_DESC.get(topic, '')}"
+    st.markdown(f'''<style>
 @media (min-width: 641px) {{
   [data-testid="stBaseButton-pillsActive"] p {{ font-size: 0 !important; }}
   [data-testid="stBaseButton-pillsActive"] p::after {{ content: "{pill_text}"; font-size: 0.92rem; }}
 }}
 </style>''', unsafe_allow_html=True)
-        # 手機上標籤不變動，說明放在標籤下面（電腦版不顯示這行）
-        st.html(f'<div class="topic-mobile">{TOPIC_DESC.get(topic, "")}</div>')
-        st.space("small")
-        topic_html = ""
-        for card in cards_by_category(jade_db, topic):
-            topic_html += qa_item(card, "topic")
-        st.html(topic_html)
 
-# 4. 選款建議
-with tab_rec:
+    # 手機版：標籤不變，說明顯示在標籤下方（電腦版不顯示）
+    st.html(f'<div class="topic-mobile">{TOPIC_DESC.get(topic, "")}</div>')
+    st.space("small")
+
+    topic_html = ""
+    for card in cards_by_category(jade_db, topic):
+        topic_html += qa_item(card, "topic")
+    st.html(topic_html)
+
+# %% 14. 分頁「選款建議」
+
+# clear_rec() 「清除選項」：必選欄位清空，選填欄位回到「不指定」
+def clear_rec():
+    st.session_state["rec_budget"] = None
+    st.session_state["rec_item"] = None
+    st.session_state["rec_use"] = None
+    st.session_state["rec_target"] = TARGETS[0]
+    st.session_state["rec_age"] = AGES[0]
+
+# style_columns() 款式卡片一律以三欄寬度排列；不足三個時置中（與新手入門「底、工」相同排法）
+def style_columns(count):
+    if count == 1:
+        return [st.columns(3)[1]]
+    if count == 2:
+        return st.columns([1, 2, 2, 1])[1:3]
+    return st.columns(count)
+
+# show_rec_result() 顯示建議：預算建議、送禮（配戴）建議、適合的款式
+def show_rec_result(budget, item, use, target, age):
+
+    # 品項＋用途決定款式（四層退回，任何組合都有建議）；預算、對象、年齡各自找提醒
+    rule = find_rule(budget, item, use, jade_db)
+    tips = find_tips(target, age, item, budget, jade_db)
+
+    # 提醒分兩組：預算一組，對象與年齡一組
+    budget_tips = []
+    gift_tips = []
+    for tip in tips:
+        if tip["kind"] == "預算":
+            budget_tips.append(tip)
+        else:
+            gift_tips.append(tip)
+
+    section("二、建議結果")
+    with st.container(key="result-panel"):         # 結果區整塊淺綠底，卡片白底，與上方選擇區區隔
+        # 有對象或年齡提醒時與預算建議左右並排；沒有時預算建議占滿整排
+        if gift_tips:
+            budget_area, gift_area = st.columns(2)
+        else:
+            budget_area = st
+
+        with budget_area.container(border=True, height="stretch", key="result-card-budget"):
+            st.subheader(f":green[預算建議（{budget}）]")
+            for tip in budget_tips:
+                st.write(tip["tip"])
+
+        if gift_tips:
+            with gift_area.container(border=True, height="stretch", key="result-card-gift"):
+                # 自己戴或未指定對象是「配戴建議」，買給別人才是「送禮建議」
+                gift_title = "送禮建議"
+                if target == "自己" or target == TARGETS[0]:
+                    gift_title = "配戴建議"
+                st.subheader(f":green[{gift_title}]")
+                for tip in gift_tips:
+                    st.html(f'<div class="sub-title">{tip["kind"]}｜{tip["option"]}</div>')
+                    st.write(tip["tip"])
+
+        with st.container(border=True, key="result-card-style"):
+            st.subheader(f":green[適合的款式（{item}｜{use}）]")
+            if rule["match"] == "general":
+                st.caption("這個用途還沒有專屬建議，先提供這個品項的通用建議。")
+
+            columns = style_columns(len(rule["suggestions"]))
+            for i, name in enumerate(rule["suggestions"]):
+                with columns[i].container(border=True, height="stretch", key=f"result-sug-{i}"):
+                    st.markdown(f":green[**建議 {i + 1}**]")
+                    st.markdown(f"**{name}**")
+                    # 款式圖片：先找「規則編號｜款式」專用的圖，沒有再用款式名稱的通用圖
+                    rule_key = rule["id"] + "｜" + name
+                    if rule_key in IMAGES:
+                        st.html(image_html(rule_key))
+                    elif name in IMAGES:
+                        st.html(image_html(name))
+
+            # 選購重點以「；」分隔，拆開後逐條列出，每條結尾補上句號
+            st.html('<div class="sub-title line-top"><span class="mark">選購重點</span></div>')
+            for point in rule["caution"].split("；"):
+                if not point.endswith("。"):
+                    point = point + "。"
+                st.markdown(f"- {point}")
+
+        # 選款建議是作者依知識卡整理的內容（來源列在知識卡上），所以這裡不列參考資料
+        st.html('<div class="rec-note">以上為作者依本站知識卡整理的選購建議，僅供參考；想了解原因，可以到「知識搜尋」查詢相關知識。</div>')
+
+def rec_tab():
     section("一、選擇條件")
-    # 用表單（form）包起來：選好後按「查看建議」才查詢；三個必選欄位都不預設，請使用者自己選
-    def clear_rec():
-        st.session_state["rec_budget"] = None
-        st.session_state["rec_item"] = None
-        st.session_state["rec_use"] = None
-        st.session_state["rec_target"] = TARGETS[0]
-        st.session_state["rec_age"] = AGES[0]
-
+    # 用表單包起來：選好後按「查看建議」才查詢；三個必選欄位不預設，由使用者自己選
     with st.form("rec_form"):
         st.caption(":red[*]必選")
         budget_col, item_col, use_col = st.columns(3)
@@ -671,83 +761,38 @@ with tab_rec:
         submitted = submit_col.form_submit_button("查看建議", type="primary", use_container_width=True)
         clear_col.form_submit_button("清除選項", on_click=clear_rec, use_container_width=True)
 
-    if submitted and (budget is None or item is None or use is None):
+    if not submitted:
+        return
+    if budget is None or item is None or use is None:
         st.warning("請先選擇預算、品項和用途。")
-    elif submitted:
-        # 品項＋用途決定款式（四層退回，任何組合都有建議）；預算、對象、年齡各自找提醒
-        rule = find_rule(budget, item, use, jade_db)
-        tips = find_tips(target, age, item, budget, jade_db)
-        # 提醒分兩組：預算一組，對象和年齡一組
-        budget_tips = []
-        gift_tips = []
-        for tip in tips:
-            if tip["kind"] == "預算":
-                budget_tips.append(tip)
-            else:
-                gift_tips.append(tip)
+        return
+    show_rec_result(budget, item, use, target, age)
 
-        section("二、建議結果")
-        # 答案區整塊鋪淺綠底、裡面的卡片白底，和上面的點選區分開
-        with st.container(key="result-panel"):
-            # 有對象或年齡提醒時，提醒卡片放在預算建議右邊；沒有時預算建議佔滿整排
-            if gift_tips:
-                budget_area, gift_area = st.columns(2)
-            else:
-                budget_area = st
+# %% 15. 分頁「避坑清單」
 
-            # 第一區：預算建議（預算是必選，所以放最上面）
-            with budget_area.container(border=True, height="stretch", key="result-card-budget"):
-                st.subheader(f":green[預算建議（{budget}）]")
-                for tip in budget_tips:
-                    st.write(tip["tip"])
+# check_color() 勾得越多，卡片底色越深
+def check_color(ratio):
+    if ratio == 0:
+        return "#4F6B62"
+    if ratio < 0.5:
+        return "#1F9A7A"
+    if ratio < 1:
+        return "#0B7A6B"
+    return "#0B5C52"
 
-            # 第二區：送禮建議（有選對象或年齡才出現）
-            if gift_tips:
-                with gift_area.container(border=True, height="stretch", key="result-card-gift"):
-                    # 自己戴或沒指定對象是「配戴建議」，買給別人才是「送禮建議」
-                    gift_title = "送禮建議"
-                    if target == "自己" or target == TARGETS[0]:
-                        gift_title = "配戴建議"
-                    st.subheader(f":green[{gift_title}]")
-                    for tip in gift_tips:
-                        st.html(f'<div class="sub-title">{tip["kind"]}｜{tip["option"]}</div>')
-                        st.write(tip["tip"])
+# check_note() 進度卡片下方的提示：全部確認完「可以安心付款」；確認達 CHECK_ENOUGH 項「可以考慮購買」
+def check_note(done, total):
+    if done == total:
+        return "check-float is-done", '<div class="check-done">✓ 可以安心付款</div>'
+    if done < CHECK_ENOUGH:
+        return "check-float", ""
+    # 只有第一次達到時播放動畫，之後再勾選就不再播放
+    if st.session_state.get("check_ten_shown"):
+        return "check-float", '<div class="check-done no-pop">✓ 可以考慮購買</div>'
+    st.session_state["check_ten_shown"] = True
+    return "check-float", '<div class="check-done">✓ 可以考慮購買</div>'
 
-            # 第三區：適合的款式（改品項或用途，這一區會變）
-            with st.container(border=True, key="result-card-style"):
-                st.subheader(f":green[適合的款式（{item}｜{use}）]")
-                if rule["match"] == "general":
-                    st.caption("這個用途還沒有專屬建議，先提供這個品項的通用建議。")
-                # 款式並排成卡片，一律照三欄的寬度排；不到三個就放中間（和新手入門「底、工」那排一樣的排法）
-                count = len(rule["suggestions"])
-                if count == 1:
-                    columns = [st.columns(3)[1]]
-                elif count == 2:
-                    columns = st.columns([1, 2, 2, 1])[1:3]
-                else:
-                    columns = st.columns(count)
-                for i, name in enumerate(rule["suggestions"]):
-                    with columns[i].container(border=True, height="stretch", key=f"result-sug-{i}"):
-                        st.markdown(f":green[**建議 {i + 1}**]")
-                        st.markdown(f"**{name}**")
-                        rule_key = rule["id"] + "｜" + name
-                        if rule_key in IMAGES:
-                            st.html(image_html(rule_key))
-                        elif name in IMAGES:
-                            st.html(image_html(name))
-                st.html('<div class="sub-title line-top"><span class="mark">選購重點</span></div>')
-                # 選購重點原本用「；」隔開，拆開後一條一條列出來
-                for point in rule["caution"].split("；"):
-                    # 每一條結尾都補上句號（最後一條本來就有，不重複加）
-                    if not point.endswith("。"):
-                        point = point + "。"
-                    st.markdown(f"- {point}")
-
-            # 選款建議＝作者依知識卡整理的建議（知識卡才列 A／B 級來源），所以這裡不列參考資料
-            st.html('<div class="rec-note">以上為作者依本站知識卡整理的選購建議，僅供參考；想了解原因，可以到「知識搜尋」查詢相關知識。</div>')
-
-# 5. 避坑清單
-with tab_check:
+def check_tab():
     st.space("medium")
     st.caption("付款前，逐項確認：")
     done = 0
@@ -758,40 +803,23 @@ with tab_check:
         with st.container(border=True, key=f"strong-box-check-{group_no}"):
             st.html(f'<div class="box-title box-good">{group}</div>')
             for i, text in enumerate(checks):
-                checked = st.checkbox(text, key=f"check_{group}_{i}")
-                if checked:
+                if st.checkbox(text, key=f"check_{group}_{i}"):
                     done = done + 1
                 total = total + 1
-    # 勾得越多，字越大、卡片底色越深
+
+    # 進度卡片：勾得越多，數字越大、進度條越粗
     ratio = done / total
-    if ratio == 0:
-        color = "#4F6B62"
-    elif ratio < 0.5:
-        color = "#1F9A7A"
-    elif ratio < 1:
-        color = "#0B7A6B"
-    else:
-        color = "#0B5C52"
+    color = check_color(ratio)
     size = 2 + 1.4 * ratio
     bar_height = 0.7 + 0.6 * ratio
-    done_note = ""
-    float_class = "check-float"
-    # 確認約 10 項就可以考慮購買；全部確認完才顯示「可以安心付款」
-    if done == total:
-        float_class = "check-float is-done"
-        done_note = '<div class="check-done">✓ 可以安心付款</div>'
-    elif done >= 10:
-        # 只有第一次達到 10 項時跳出動畫，之後再勾選就靜靜顯示
-        if st.session_state.get("check_ten_shown"):
-            done_note = '<div class="check-done no-pop">✓ 可以考慮購買</div>'
-        else:
-            st.session_state["check_ten_shown"] = True
-            done_note = '<div class="check-done">✓ 可以考慮購買</div>'
-    # 記住上一次的百分比，進度條才能從舊的位置動畫長到新的位置
+    float_class, done_note = check_note(done, total)
+
+    # 記住上一次的百分比，進度條才能從原本的位置以動畫延伸到新的位置
     percent = ratio * 100
     last_percent = st.session_state.get("check_last_percent", 0)
     st.session_state["check_last_percent"] = percent
-    # 固定在畫面右側，捲到哪裡都看得到
+
+    # 卡片固定在畫面右側，捲動時也看得到
     st.html(
         f'<div class="{float_class}" style="--from:{last_percent}%; --to:{percent}%; background:{color};">'
         f'<div class="check-label">已確認</div>'
@@ -801,77 +829,39 @@ with tab_check:
     )
     st.caption("整理自知識卡 K038（證書要看哪些地方）、K046（怎麼避免買到處理過的翡翠）及一般選購常識；知識卡的參考資料見各卡片。")
 
-# %% 11. 翠小二（翡翠問答機器人）：右下角的浮動按鈕，點了跳出對話視窗
+# %% 16. 翠小二（翡翠問答機器人）：右下角浮動按鈕，點了開啟對話視窗
+# 判斷與回答都在 bot.py；這裡只負責對話視窗的畫面
 
-# 大腦在 bot.py：判斷意圖 → 閒聊／查知識卡／帶路到分頁；沒把握就反問、有錯字就猜
-
-# %% 12. bot_click() 使用者點了對話裡的選項按鈕：先記下來，視窗重跑時當成使用者打的字
-
+# bot_click() 點了對話中的選項按鈕：先記下來，視窗重跑時當成使用者輸入的句子
 def bot_click(option):
     st.session_state["bot_pending"] = option
 
-# %% 13. type_out() 打字效果：先顯示「…」跳動一下，再每次多 3 個字，像真人在打字
+# goto_click() 點了「➜ 前往…」按鈕：先記下目的分頁，視窗重跑時第一時間切換（與自動帶路同一個時間點）
+def goto_click(goto):
+    st.session_state["bot_goto"] = goto
 
+# type_out() 打字效果：先顯示跳動的「…」，再每次多顯示 3 個字
 def type_out(text):
-
-    # 先顯示三個跳動的點（樣式在最上面的 CSS：.typing）
     area = st.empty()
-    area.html('<div class="typing"><span></span><span></span><span></span></div>')
+    area.html('<div class="typing"><span></span><span></span><span></span></div>')     # 樣式見 CSS 的 .typing
     time.sleep(0.8)
 
-    # 每次多 3 個字；整段大約 1.5 秒打完，長的答案也不會等太久
+    # 整段約 1.5 秒顯示完，長的答案也不會等太久
     wait = min(0.03, 1.5 / max(len(text) / 3, 1))
     for end in range(3, len(text) + 3, 3):
         area.markdown(text[:end])
         time.sleep(wait)
 
-# %% 14. go_to() 帶路：切換到指定的分頁，有 fill 就順便幫忙選好那一頁的選項，再整頁重跑＝關掉視窗
-
+# go_to() 帶路：切換到指定分頁，有 fill 就預先選好那一頁的選項，再重跑整頁（同時關閉對話視窗）
 def go_to(goto):
-    st.session_state["main_tabs"] = goto["tab"]
+    st.session_state["tab_target"] = goto["tab"]
+    st.session_state["tab_round"] = st.session_state.get("tab_round", 0) + 1     # 換一組新的分頁元件，見 %% 17
     for key, value in goto.get("fill", {}).items():
         st.session_state[key] = value
     st.rerun()
 
-# %% 15. bot_window() 翠小二的對話視窗
-
-@st.dialog("翠小二｜翡翠問答", width="medium")
-def bot_window():
-
-    # 第一次打開：放一句開場白
-    if "bot_history" not in st.session_state:
-        st.session_state["bot_history"] = [{"role": "assistant", "text": WELCOME, "options": start_options()}]
-
-    # 右上角「重新開始對話」：先跳出小視窗確認，按「確定」才清掉對話
-    reset_area = st.columns([2, 1])[1]
-    with reset_area.popover("重新開始對話", icon=":material/refresh:", key="bot-reset"):
-        st.write("確定要清除目前的對話嗎？")
-        yes_area, no_area = st.columns(2)
-        if yes_area.button("確定", type="primary", key="bot-reset-yes"):
-            del st.session_state["bot_history"]
-            st.rerun(scope="fragment")
-        if no_area.button("取消", key="bot-reset-no"):
-            st.rerun(scope="fragment")
-
-    # 先放對話框、再放輸入框（輸入框在下面）；內容等處理完這句話再放進對話框
-    box = st.container(height=430, border=False, key="bot-box")
-    typed = st.chat_input("輸入您的翡翠問題…", key="bot_input")
-    pending = st.session_state.pop("bot_pending", None)
-    user_text = typed
-    if pending:
-        user_text = pending
-
-    # 有新的一句話 → 交給 bot.py 的 reply() 回答，記進對話紀錄
-    if user_text:
-        st.session_state["bot_history"].append({"role": "user", "text": user_text})
-        answer = reply(user_text, jade_db)
-        answer["role"] = "assistant"
-        answer["new"] = True
-        st.session_state["bot_history"].append(answer)
-        if answer.get("auto"):
-            go_to(answer["goto"])
-
-    # 一則一則顯示對話；只有最後一則回答的按鈕可以點
+# show_history() 依序顯示對話；只有最後一則回答的按鈕可以點
+def show_history(box):
     history = st.session_state["bot_history"]
     with box:
         for i, message in enumerate(history):
@@ -888,16 +878,91 @@ def bot_window():
                 for j, option in enumerate(message.get("options", [])):
                     st.button(option, key=f"bot-opt-{i}-{j}", on_click=bot_click, args=(option,))
                 goto = message.get("goto")
-                if goto and st.button("➜ " + goto["label"], key=f"bot-goto-{i}", type="primary"):
-                    go_to(goto)
+                if goto:
+                    st.button("➜ " + goto["label"], key=f"bot-goto-{i}", type="primary",
+                              on_click=goto_click, args=(goto,))
 
+@st.dialog("翠小二｜翡翠問答", width="medium")
+def bot_window():
 
-# 右下角的浮動按鈕（位置、顏色、上面的提示泡泡在 CSS：.st-key-bot-fab）
+    # 第一次開啟時放開場白
+    if "bot_history" not in st.session_state:
+        st.session_state["bot_history"] = [{"role": "assistant", "text": WELCOME, "options": start_options()}]
+
+    # 右上角「重新開始對話」：先確認，按「確定」才清除對話
+    reset_area = st.columns([2, 1])[1]
+    with reset_area.popover("重新開始對話", icon=":material/refresh:", key="bot-reset"):
+        st.write("確定要清除目前的對話嗎？")
+        yes_area, no_area = st.columns(2)
+        if yes_area.button("確定", type="primary", key="bot-reset-yes"):
+            del st.session_state["bot_history"]
+            st.rerun(scope="fragment")
+        if no_area.button("取消", key="bot-reset-no"):
+            st.rerun(scope="fragment")
+
+    # 對話框在上、輸入框在下；這句話處理完才把內容放進對話框
+    box = st.container(height=430, border=False, key="bot-box")
+    typed = st.chat_input("輸入您的翡翠問題…", key="bot_input")
+
+    # 剛才點了「➜ 前往…」→ 先切換分頁（必須在畫出對話內容之前，分頁才會真的切換）
+    goto_now = st.session_state.pop("bot_goto", None)
+    if goto_now:
+        go_to(goto_now)
+
+    # 這次的句子：點選的按鈕優先，否則是輸入框的文字
+    pending = st.session_state.pop("bot_pending", None)
+    user_text = typed
+    if pending:
+        user_text = pending
+
+    if user_text:
+        st.session_state["bot_history"].append({"role": "user", "text": user_text})
+        answer = reply(user_text, jade_db)
+        answer["role"] = "assistant"
+        answer["new"] = True                    # 新回答用打字效果顯示
+        st.session_state["bot_history"].append(answer)
+        if answer.get("auto"):
+            go_to(answer["goto"])
+
+    show_history(box)
+
+# %% 17. 版面
+
+# 網站標題：明體字，上下細線
+st.html('<div class="site-head"><div class="site-name">一玉了然</div><div class="site-sub">翡翠選購指南｜可追溯來源的知識檢索系統</div></div>')
+
+# 五個分頁依新手順序排列：先學基礎（新手入門）→ 找答案（知識搜尋、主題瀏覽）→ 準備購買（選款建議、避坑清單）
+TAB_NAMES = ["新手入門", "知識搜尋", "主題瀏覽", "選款建議", "避坑清單"]
+
+# 要打開哪個分頁：
+#   1. 「下一步」連結會在網址加上 ?tab=分頁名稱
+#   2. 翠小二帶路（go_to）時記在 tab_target，並遞增 tab_round 換一組新的分頁元件
+#      只改 session_state 不夠：之後按「查看建議」等按鈕時，瀏覽器會送回舊的分頁狀態，又跳回原本那頁
+open_tab = st.query_params.get("tab")
+if open_tab not in TAB_NAMES:
+    open_tab = None
+if st.session_state.get("tab_target"):
+    open_tab = st.session_state["tab_target"]
+tab_basics, tab_search, tab_topics, tab_rec, tab_check = st.tabs(
+    TAB_NAMES, default=open_tab, key=f"main_tabs_{st.session_state.get('tab_round', 0)}", on_change="rerun")
+
+with tab_search:
+    search_tab()
+with tab_basics:
+    basics_tab()
+with tab_topics:
+    topics_tab()
+with tab_rec:
+    rec_tab()
+with tab_check:
+    check_tab()
+
+# 右下角浮動按鈕（位置、顏色、提示泡泡見 CSS 的 .st-key-bot-fab）
 if st.button("問翠小二", icon=":material/smart_toy:", key="bot-fab"):
     bot_window()
 
-# 手機版：第一下只把小圖示展開成「問答機器人」膠囊，第二下才真的打開對話；4 秒沒點就縮回去。
-# Streamlit 的按鈕沒有「第一下先不要動」的設定，所以用一小段 JavaScript 在網頁上攔截第一下點擊（電腦版不攔）。
+# 手機版：第一下只把圖示展開成「問答機器人」，第二下才開啟對話；4 秒沒點就收回。
+# Streamlit 按鈕沒有「第一下不動作」的設定，所以用一小段 JavaScript 攔截手機上的第一下點擊（電腦版不攔截）。
 with st.container(key="bot-js"):
     components.html("""
 <script>
@@ -920,12 +985,10 @@ if (!w.__botFabReady) {
 }
 </script>""", height=0)
 
-# 頁尾與側邊欄
-modified = DB.stat().st_mtime
-
-updated = datetime.fromtimestamp(modified).strftime("%Y-%m-%d")
+# 頁尾：最後更新日期取自資料庫檔案的修改時間
+updated = datetime.fromtimestamp(DB.stat().st_mtime).strftime("%Y-%m-%d")
 st.markdown(f'<div class="footer"><span class="footer-full">最後更新 {updated} &nbsp;｜&nbsp; 知識卡皆附參考資料，選款建議為作者整理 &nbsp;｜&nbsp; 僅供知識查詢與選購參考，實際以專業鑑定為準</span><span class="footer-short">最後更新 {updated} ｜ 僅供參考，實際以專業鑑定為準</span></div>', unsafe_allow_html=True)
 
-# 查詢紀錄的入口藏起來：只有網址後面加 ?admin=1 才出現，要輸入管理密碼才看得到內容
+# 查詢紀錄入口預設隱藏：網址加上 ?admin=1 才出現，並需輸入管理密碼
 if st.query_params.get("admin") == "1":
     admin_panel()
